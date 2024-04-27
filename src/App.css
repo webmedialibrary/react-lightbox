@@ -1,0 +1,26 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.thumbnail {
+  display: inline-block;
+  margin: 8px;
+  cursor: pointer;
+  background-color: rgba(255, 255, 255, 0.1);
+  max-width: 100%;
+
+  &:hover {
+    box-shadow: 0 0 10px #ffffff44;
+  }
+}
+
+.lightbox-thumbnail {
+  display: block;
+}
+
+.lightbox-element {
+  object-fit: contain;
+}
