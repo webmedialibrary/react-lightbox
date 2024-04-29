@@ -13,12 +13,13 @@
   max-width: 100%;
 
   &:hover {
-    box-shadow: 0 0 10px #ffffff44;
+    opacity: .8;
   }
 }
 
 .lightbox-thumbnail {
   display: block;
+  pointer-events: none;
 }
 
 .lightbox-element {

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import "./App.css"
 
 import { Lightbox, LightboxAdapter } from "./components/Lightbox"
@@ -6,7 +6,7 @@ import { Lightbox, LightboxAdapter } from "./components/Lightbox"
 const maxElements = 20;
 const elementsPerLoad = 10;
 
-const minRatio = 1 / 1;
+const minRatio = 9 / 21;
 const maxRatio = 21 / 9;
 
 const elements = new Array(maxElements);
@@ -22,26 +22,24 @@ function App() {
   const [open, setOpen] = useState(false);
 
   const adapter: LightboxAdapter<number> = {
-    renderElement: (n, p) => {
-      const { onLoad, width: w, height: h } = p;
+    renderElement: (n, {onLoad, width, height}) => {
       const ratio = elements[n];
-      let width: number, height: number;
-      if (w / h > ratio) {
-        width = Math.round(h * ratio);
-        height = h;
+      let w: number, h: number;
+      if (width / height > ratio) {
+        w = Math.round(height * ratio);
+        h = height;
       } else {
-        width = w;
-        height = Math.round(w / ratio);
+        w = width;
+        h = Math.round(width / ratio);
       }
-      const src = `https://picsum.photos/seed/${seed(n)}/${width}/${height}`;
-      return <img key={n} src={src} alt={`Image ${n}`} width={width} height={height} draggable={false} className="lightbox-element" onLoad={onLoad} />
+      const src = `https://picsum.photos/seed/${seed(n)}/${w}/${h}`;
+      return <img key={n} src={src} alt={`Image ${n}`} width={w} height={h} draggable={false} className="lightbox-element" onLoad={onLoad} />
     },
-    renderThumbnail: (n, p) => {
-      const { onLoad } = p;
-      const height = 180;
-      const width = Math.round(elements[n] * height);
-      const src = `https://picsum.photos/seed/${seed(n)}/${width}/${height}`;
-      return <img key={n} src={src} alt={`Image ${n}`} width={width} height={height} draggable={false} className="lightbox-thumbnail" onLoad={onLoad} />
+    renderThumbnail: (n, {onLoad, width, height}) => {
+      const h = height;
+      const w = Math.round(elements[n] * h);
+      const src = `https://picsum.photos/seed/${seed(n)}/${w}/${h}`;
+      return <img key={n} src={src} alt={`Image ${n}`} width={w} height={h} draggable={false} className="lightbox-thumbnail" onLoad={onLoad} />
     },
     loadElementsBefore: async (n) => {
       const list = Array<number>();
@@ -77,11 +75,19 @@ function App() {
     return images;
   }, []);
 
+  // useEffect(() => {
+  //   function handleTouchMove(ev: Event) {
+  //     console.log("touchmove");
+  //     // ev.preventDefault();
+  //   }
+  //   document.addEventListener("touchmove", handleTouchMove, {passive: false});
+  //   return () => document.removeEventListener("touchmove", handleTouchMove);
+  // }, []);
 
   return (
     <>
       <div className="gallery">{images}</div>
-      {focus !== null && <Lightbox adapter={adapter} open={open} onClose={() => setOpen(false)} focus={focus} onFocusChange={setFocus} />}
+      {focus !== null && <Lightbox adapter={adapter} open={open} onClose={() => setOpen(false)} focus={focus} onFocusChange={setFocus} thumbnailHeight={90}/>}
     </>
   )
 }
