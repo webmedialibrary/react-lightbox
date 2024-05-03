@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { create } from "jss";
 import preset from "jss-preset-default";
-import { Component, Key, ReactElement, ReactNode, createRef } from "react";
+import { Component, Key, ReactElement, ReactNode, RefObject, createRef } from "react";
 import { Transition } from "react-transition-group";
 
 const jss = create(preset());
@@ -25,31 +25,71 @@ const styles = {
         left: 0,
         width: "100%",
         height: "100%",
-        backgroundColor: "rgba(0, 0, 0, 0.8)",
-        opacity: 0,
-        transition: `opacity ${duration.leavingScreen}ms`,
+        // backgroundColor: "rgba(0, 0, 0, 0.8)",
+        // opacity: 0,
+        // transition: `opacity ${duration.leavingScreen}ms`,
         userSelect: "none",
         WebkitTapHighlightColor: "transparent",
         touchAction: "none",
+        cursor: "pointer",
+        backgroundColor: "transparent",
+        transition: `background-color ${duration.standard}ms`,
     },
-    lightboxOpen: {
-        opacity: 1,
-        transition: `opacity ${duration.enteringScreen}ms`,
+    lightboxZooming: {
+        cursor: "grab",
     },
-    closeButton: {
-        position: "fixed",
-        top: 8,
-        right: 8,
+    lightboxReady: {
+        backgroundColor: "rgba(0, 0, 0, 0.8)",
+        transition: `background-color ${duration.complex}ms`,
+        // opacity: 1,
+        // transition: `opacity ${duration.enteringScreen}ms`,
+    },
+    iconButton: {
         padding: 4,
         border: "none",
         background: "none",
         cursor: "pointer",
         fill: "#d7d7d7",
-        backgroundColor: "rgba(45, 45, 45, 0.5)",
+        backgroundColor: "#202020c9",
         transition: `background-color ${duration.standard}ms`,
         "&:hover": {
-            backgroundColor: "rgba(65, 65, 65, 0.5)",
+            backgroundColor: "#151515c9",
         },
+    },
+    closeButton: {
+        position: "fixed",
+        top: 8,
+        right: 8,
+    },
+    navigateNextButton: {
+        position: "fixed",
+        top: `calc(50% - 64px)`,
+        right: 40,
+        padding: 8,
+        opacity: 1,
+        transform: "none",
+        transition: `opacity ease-out ${duration.shorter}ms 200ms, transform ease-out ${duration.standard}ms 200ms`,
+    },
+    navigateNextButtonZooming: {
+        transform: "translateX(20px)",
+        opacity: 0,
+        pointerEvents: "none",
+        transition: `opacity ease-in ${duration.standard}ms, transform ease-in ${duration.standard}ms`,
+    },
+    navigateBeforeButton: {
+        position: "fixed",
+        top: `calc(50% - 64px)`,
+        left: 40,
+        padding: 8,
+        opacity: 1,
+        transform: "none",
+        transition: `opacity ease-out ${duration.shorter}ms 200ms, transform ease-out ${duration.standard}ms 200ms`,
+    },
+    navigateBeforeButtonZooming: {
+        transform: "translateX(-20px)",
+        opacity: 0,
+        pointerEvents: "none",
+        transition: `opacity ease-in ${duration.standard}ms, transform ease-in ${duration.standard}ms`,
     },
     thumbnails: {
         position: "fixed",
@@ -58,7 +98,7 @@ const styles = {
         width: "100%",
         height: 196,
         boxSizing: "border-box",
-        transition: `opacity ease-out ${duration.shorter}ms, transform ease-out ${duration.standard}ms 150ms`,
+        transition: `opacity ease-out ${duration.shorter}ms, transform ease-out ${duration.standard}ms`,
     },
     thumbnailsZooming: {
         opacity: 0,
@@ -134,14 +174,15 @@ const { classes } = jss.createStyleSheet(styles).attach();
 type ElementProps = {
     width: number,
     height: number,
-    onLoad: () => void,
+    onLoad: (ev: React.SyntheticEvent<HTMLElement>) => void,
 }
 
 export interface LightboxAdapter<Type> {
     renderElement: (element: Type, props: ElementProps) => ReactElement,
     renderThumbnail: (element: Type, props: ElementProps) => ReactElement,
+    renderHeading: (element: Type) => ReactNode,
     loadElementsBefore: (element: Type) => Promise<Type[]>,
-    loadElementsAfter: (element: Type) => Promise<Type[]>,
+    loadElementsNext: (element: Type) => Promise<Type[]>,
 }
 
 export interface LightboxProps<Type> {
@@ -149,6 +190,7 @@ export interface LightboxProps<Type> {
     open: boolean,
     onClose: () => void,
     focus: Type,
+    focusRef?: RefObject<HTMLElement>,
     onFocusChange: (focus: Type) => void,
     thumbnailHeight?: number,
 }
@@ -157,7 +199,8 @@ const defaultThumbnailHeight = 180;
 
 interface LightboxState<Type> {
     loadingBefore: boolean,
-    loadingAfter: boolean,
+    loadingNext: boolean,
+    ready: boolean,
     zooming: boolean,
     elements: Type[],
 }
@@ -170,7 +213,8 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
         super(props);
         this.state = {
             loadingBefore: false,
-            loadingAfter: false,
+            loadingNext: false,
+            ready: false,
             elements: [this.props.focus],
             zooming: false,
         };
@@ -223,19 +267,19 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
         });
     }
 
-    loadingAfter = false;
-    hasMoreAfter = true;
+    loadingNext = false;
+    hasMoreNext = true;
 
-    loadElementsAfter() {
-        if (this.loadingAfter || !this.hasMoreAfter) return;
-        this.loadingAfter = true;
-        this.setState({ loadingAfter: true });
-        this.props.adapter.loadElementsAfter(this.state.elements[this.state.elements.length - 1]).then(n => {
-            this.loadingAfter = false;
-            this.hasMoreAfter = n.length > 0;
+    loadElementsNext() {
+        if (this.loadingNext || !this.hasMoreNext) return;
+        this.loadingNext = true;
+        this.setState({ loadingNext: true });
+        this.props.adapter.loadElementsNext(this.state.elements[this.state.elements.length - 1]).then(n => {
+            this.loadingNext = false;
+            this.hasMoreNext = n.length > 0;
             this.setState(state => ({
                 ...state,
-                loadingAfter: false,
+                loadingNext: false,
                 elements: [...state.elements, ...n],
             }));
         });
@@ -254,7 +298,7 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
         return false;
     }
 
-    selectAfter() {
+    selectNext() {
         const index = this.state.elements.indexOf(this.focus);
         if (index < this.state.elements.length - 1) {
             this.props.onFocusChange(this.state.elements[index + 1]);
@@ -270,7 +314,7 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
         if (index === -1) {
             this.setState({
                 elements: [this.props.focus],
-                loadingAfter: false,
+                loadingNext: false,
                 loadingBefore: false,
             });
             return;
@@ -283,6 +327,9 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
     }
 
     componentDidUpdate(prevProps: Readonly<LightboxProps<Type>>, prevState: Readonly<LightboxState<Type>>, snapshot?: any): void {
+        if (!this.props.open && this.state.ready) {
+            this.setState({ ready: false });
+        }
         this.refreshElements();
     }
 
@@ -290,26 +337,50 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
         window.removeEventListener("keydown", this.handleKeyDown);
     }
 
+    handleExiting?: () => void;
+
     render(): ReactNode {
         const index = this.state.elements.indexOf(this.props.focus);
         if (index === -1) throw new Error("Focus not found in elements");
 
+        const isTouchDevice = navigator.maxTouchPoints !== 0;
+
         const { adapter, open, onClose, focus, onFocusChange } = this.props;
-        return <Transition in={open} timeout={{ appear: duration.enteringScreen, enter: duration.enteringScreen, exit: duration.leavingScreen }} nodeRef={this.ref} mountOnEnter unmountOnExit>
-            {state => (
-                <div className={clsx("lightbox", classes.lightbox, (state === "entered" || state === "entering") && classes.lightboxOpen)} ref={this.ref}>
-                    <ThumbnailBar lightbox={this} />
+        return <Transition in={open} timeout={{ appear: duration.enteringScreen, enter: duration.enteringScreen, exit: duration.leavingScreen }} nodeRef={this.ref} mountOnEnter unmountOnExit onExiting={() => this.handleExiting?.()}>
+            <Transition in={this.state.ready} timeout={duration.complex} nodeRef={this.ref}>
+                {state => (
+                    <div className={clsx("lightbox", classes.lightbox, (state === "entered" || state === "entering") && classes.lightboxReady, this.state.zooming && classes.lightboxZooming)} ref={this.ref}>
+                        <ThumbnailBar lightbox={this} />
 
-                    <Accordion lightbox={this} />
+                        <Accordion lightbox={this} />
 
-                    <CloseButton onClick={onClose} />
+                        <CloseButton onClick={onClose} />
 
-                    <h1 className={classes.heading}>Lightbox</h1>
+                        {!isTouchDevice && <NavigateNextButton onClick={() => this.selectNext()} zooming={this.state.zooming} />}
+                        {!isTouchDevice && <NavigateBeforeButton onClick={() => this.selectBefore()} zooming={this.state.zooming} />}
 
-                    {/* <div>{focus !== null && adapter.renderThumbnail(focus)}</div> */}
-                </div>
-            )}
-        </Transition>
+                        <h1 className={classes.heading}>{this.adapter.renderHeading(this.focus)}</h1>
+                    </div>
+                )}
+            </Transition>
+        </Transition>;
+
+        // return <Transition in={open} timeout={{ appear: duration.enteringScreen, enter: duration.enteringScreen, exit: duration.leavingScreen }} nodeRef={this.ref} mountOnEnter unmountOnExit>
+        //     {state => (
+        //         <div className={clsx("lightbox", classes.lightbox, (state === "entered" || state === "entering") && classes.lightboxReady, this.state.zooming && classes.lightboxZooming)} ref={this.ref}>
+        //             <ThumbnailBar lightbox={this} />
+
+        //             <Accordion lightbox={this} />
+
+        //             <CloseButton onClick={onClose} />
+
+        //             <NavigateNextButton onClick={() => this.selectNext()} zooming={this.state.zooming} />
+        //             <NavigateBeforeButton onClick={() => this.selectBefore()} zooming={this.state.zooming} />
+
+        //             <h1 className={classes.heading}>{this.adapter.renderHeading(this.focus)}</h1>
+        //         </div>
+        //     )}
+        // </Transition>
     }
 }
 
@@ -320,13 +391,48 @@ interface CloseButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
 
 function CloseButton(props: CloseButtonProps) {
     return (
-        <button className={clsx(classes.closeButton)} {...props}>
+        <button className={clsx(classes.iconButton, classes.closeButton)} {...props}>
             <svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 -960 960 960" width="40" className={classes.svgIcon}>
                 <path d="m251.333-204.667-46.666-46.666L433.334-480 204.667-708.667l46.666-46.666L480-526.666l228.667-228.667 46.666 46.666L526.666-480l228.667 228.667-46.666 46.666L480-433.334 251.333-204.667Z" />
             </svg>
         </button>
     )
 }
+
+
+interface NavigateNextButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    zooming: boolean,
+}
+
+function NavigateNextButton(props: NavigateNextButtonProps) {
+    const { zooming } = props;
+
+    return (
+        <button className={clsx(classes.iconButton, classes.navigateNextButton, zooming && classes.navigateNextButtonZooming)} {...props}>
+            <svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 -960 960 960" width="40" className={classes.svgIcon}>
+                <path d="M521.33-480.67 328-674l47.33-47.33L616-480.67 375.33-240 328-287.33l193.33-193.34Z" />
+            </svg>
+        </button>
+    )
+}
+
+
+interface NavigateBeforeButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+    zooming: boolean,
+}
+
+function NavigateBeforeButton(props: NavigateBeforeButtonProps) {
+    const { zooming } = props;
+
+    return (
+        <button className={clsx(classes.iconButton, classes.navigateBeforeButton, zooming && classes.navigateBeforeButtonZooming)} {...props}>
+            <svg xmlns="http://www.w3.org/2000/svg" height="40" viewBox="0 -960 960 960" width="40" className={classes.svgIcon}>
+                <path d="M560.67-240 320-480.67l240.67-240.66L608-674 414.67-480.67 608-287.33 560.67-240Z" />
+            </svg>
+        </button>
+    )
+}
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -337,7 +443,7 @@ interface AccordionProps<T> {
 }
 
 interface AccordionState<T> {
-
+    ready: boolean,
 }
 
 const maxScale = 3;
@@ -350,11 +456,17 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
     constructor(props: AccordionProps<T>) {
         super(props);
         this.lastFocus = this.focus;
+        this.state = {
+            ready: true
+        };
+        this.lightbox.handleExiting = () => this.handleExiting();
     }
 
     ref = createRef<HTMLDivElement>();
     refBefore = createRef<HTMLDivElement>();
-    refAfter = createRef<HTMLDivElement>();
+    refNext = createRef<HTMLDivElement>();
+
+    touchAction: "none" | "pinch-zoom" | "pan" = "none";
 
     translateX = 0;
     translateY = 0;
@@ -436,14 +548,13 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
             element.style.transform = `translate(${this.translateX}px, ${this.translateY}px) scale(${this.scale})`;
         }
 
-        const elementAfter = this.refAfter.current as HTMLElement | null;
-        if (elementAfter) {
-            // elementAfter.style.display = this.translateX <= 0 ? "flex" : "none";
-            if (this.translateX > 0 || this.scale < 1) elementAfter.style.visibility = "hidden";
-            if (this.translateX < 0 && this.scale == 1) elementAfter.style.visibility = "visible";
-            const imageAfter = elementAfter.firstChild as HTMLElement;
-            const x = this.translateX + window.innerWidth - (window.innerWidth - imageAfter.offsetWidth) / 2;
-            const animation = elementAfter.animate([
+        const elementNext = this.refNext.current as HTMLElement | null;
+        if (elementNext) {
+            if (this.translateX > 0 || this.scale < 1) elementNext.style.visibility = "hidden";
+            if (this.translateX < 0 && this.scale == 1) elementNext.style.visibility = "visible";
+            const imageNext = elementNext.firstChild as HTMLElement;
+            const x = this.translateX + window.innerWidth - (window.innerWidth - imageNext.offsetWidth) / 2;
+            const animation = elementNext.animate([
                 { transform: `translate(${x}px` }
             ], {
                 duration: easing === "instant" ? 0 : duration.standard,
@@ -451,7 +562,7 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
                 fill: "both",
             });
             animation.onfinish = () => {
-                elementAfter.style.transform = `translate(${x}px`;
+                elementNext.style.transform = `translate(${x}px`;
             }
         }
 
@@ -460,7 +571,6 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         if (elementBefore) {
             if (this.translateX < 0 || this.scale < 1) elementBefore.style.visibility = "hidden";
             if (this.translateX > 0 && this.scale == 1) elementBefore.style.visibility = "visible";
-            // elementBefore.style.display = this.translateX >= 0 ? "flex" : "none";
             const imageBefore = elementBefore.firstChild as HTMLElement;
             const x = this.translateX - window.innerWidth + (window.innerWidth - imageBefore.offsetWidth) / 2;
             const animation = elementBefore.animate([
@@ -481,11 +591,13 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
 
     handlePointerDown = (ev: React.PointerEvent) => {
         const { pointerId } = ev;
+
         // ev.preventDefault();
         this.pointers.set(pointerId, { clientX: ev.clientX, clientY: ev.clientY, timeStamp: ev.timeStamp });
 
         const root = this.ref.current!.parentElement!;
         root.setPointerCapture(pointerId);
+
 
         let { clientX, clientY } = ev;
 
@@ -499,8 +611,14 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
             // ev.preventDefault();
             this.pointers.set(pointerId, { clientX: ev.clientX, clientY: ev.clientY, timeStamp: ev.timeStamp });
 
-            this.translateX += (ev.clientX - clientX) / this.pointers.size;
-            this.translateY += (ev.clientY - clientY) / this.pointers.size;
+            if (ev.pointerType === "mouse" && this.scale > 1) {
+                root.closest<HTMLElement>(`.${classes.lightbox}`)!.style.cursor = "grabbing";
+            }
+
+            if (ev.pointerType === "touch" || this.scale > 1) {
+                this.translateX += (ev.clientX - clientX) / this.pointers.size;
+                this.translateY += (ev.clientY - clientY) / this.pointers.size;
+            }
             clientX = ev.clientX;
             clientY = ev.clientY;
 
@@ -524,19 +642,24 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
             if (ev.pointerId !== pointerId) return;
             root.releasePointerCapture(pointerId);
             this.pointers.delete(pointerId);
+            // ev.preventDefault();
 
             root.removeEventListener("pointermove", handlePointerMove);
             root.removeEventListener("pointerup", handlePointerUp);
 
             if (this.pointers.size === 0) {
+                root.closest<HTMLElement>(`.${classes.lightbox}`)!.style.cursor = "";
+
                 if (!this.lightbox.state.zooming) {
-                    if (this.translateX > window.innerWidth / 10) {
-                        if (this.lightbox.selectBefore()) return;
-                    } else if (this.translateX < -window.innerWidth / 10) {
-                        if (this.lightbox.selectAfter()) return;
+                    if (ev.pointerType === "touch") {
+                        if (this.translateX > window.innerWidth / 10) {
+                            if (this.lightbox.selectBefore()) return;
+                        } else if (this.translateX < -window.innerWidth / 10) {
+                            if (this.lightbox.selectNext()) return;
+                        }
+                        this.translateX = 0;
+                        this.updateTransform("ease-out");
                     }
-                    this.translateX = 0;
-                    this.updateTransform("ease-out");
                 } else {
                     if (this.scale < 1) {
                         this.lightbox.setState({ zooming: false });
@@ -569,32 +692,11 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         this.scale = scale;
     }
 
-    handleDoubleClick = (ev: React.MouseEvent) => {
-        if (this.lightbox.state.zooming) {
-            this.lightbox.setState({ zooming: false });
-            this.scale = 1;
-            this.translateX = 0;
-            this.translateY = 0;
-        } else {
-            this.lightbox.setState({ zooming: true });
-            this.pointScale(2, ev.clientX, ev.clientY);
-        }
-        this.updateTransform("ease-in-out");
-
-        // if (this.scale === 1 && this.translateX === 0 && this.translateY === 0) {
-        //     this.pointScale(2, ev.clientX, ev.clientY);
-        // } else {
-        //     this.scale = 1;
-        //     this.translateX = 0;
-        //     this.translateY = 0;
-        // }
-        // this.updateTransform(false);
-    }
-
     handleClick = (ev: React.MouseEvent) => {
+        console.log("handleClick()")
         if (this.scale === 1) {
             if (ev.clientX > window.innerWidth / 3 * 2) {
-                this.lightbox.selectAfter();
+                this.lightbox.selectNext();
             } else if (ev.clientX < window.innerWidth / 3) {
                 this.lightbox.selectBefore();
             }
@@ -605,6 +707,87 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         //     this.translateY = 0;
         //     this.updateTransform(false);
         // }
+    }
+
+    handleDoubleClick = (ev: React.MouseEvent) => {
+        console.log("handleDoubleClick()");
+        if (this.scale !== 1) {
+            this.lightbox.setState({ zooming: false });
+            this.scale = 1;
+            this.translateX = 0;
+            this.translateY = 0;
+            this.updateTransform("ease-in-out");
+        } else {
+            if (ev.clientX > window.innerWidth / 3 && ev.clientX < window.innerWidth / 3 * 2) {
+                this.lightbox.setState({ zooming: true });
+                this.pointScale(2, ev.clientX, ev.clientY);
+                this.updateTransform("ease-in-out");
+            }
+        }
+        // if (this.scale === 1 && this.translateX === 0 && this.translateY === 0) {
+        //     this.pointScale(2, ev.clientX, ev.clientY);
+        // } else {
+        //     this.scale = 1;
+        //     this.translateX = 0;
+        //     this.translateY = 0;
+        // }
+        // this.updateTransform(false);
+    }
+
+    ready = true;
+
+    handleElementLoad = (ev: React.SyntheticEvent<HTMLElement>) => {
+        const target = ev.target as HTMLElement;
+        if (!this.ready) return;
+        this.ready = false;
+        this.setState({ ready: false });
+        const source = this.lightbox.props.focusRef?.current;
+        if (!source) return;
+        const targetRect = target.getBoundingClientRect();
+        const sourceRect = source.getBoundingClientRect();
+
+        const dx = sourceRect.left + sourceRect.width / 2 - targetRect.left - targetRect.width / 2;
+        const dy = sourceRect.top + sourceRect.height / 2 - targetRect.top - targetRect.height / 2;
+        const sx = sourceRect.width / targetRect.width;
+        const sy = sourceRect.height / targetRect.height;
+
+        this.lightbox.setState({ ready: true });
+
+        this.ref.current!.style.opacity = "1";
+
+        target.animate([
+            { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
+            { transform: "none" }
+        ], {
+            duration: duration.complex,
+            easing: "ease-out",
+            fill: "both",
+        });
+    }
+
+    handleExiting = () => {
+        const target = this.lightbox.props.focusRef?.current;
+        if (!target) return;
+
+        const source = this.ref.current!.firstChild as HTMLElement;
+        if (!source) return;
+
+        const targetRect = target.getBoundingClientRect();
+        const sourceRect = source.getBoundingClientRect();
+
+        const dx = targetRect.left + targetRect.width / 2 - sourceRect.left - sourceRect.width / 2;
+        const dy = targetRect.top + targetRect.height / 2 - sourceRect.top - sourceRect.height / 2;
+        const sx = targetRect.width / sourceRect.width;
+        const sy = targetRect.height / sourceRect.height;
+
+        source.animate([
+            { transform: "none" },
+            { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` }
+        ], {
+            duration: duration.short,
+            easing: "ease-out",
+            fill: "both",
+        });
     }
 
     //
@@ -628,7 +811,7 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
             this.scale = 1;
             this.translateX = 0;
             this.translateY = 0;
-            this.updateTransform("ease-in-out");
+            this.updateTransform("ease-out");
         } else {
             // this.updateTransform(true);
         }
@@ -640,7 +823,7 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         if (index === -1) throw new Error("Focus not found in elements");
 
         const before = index > 0 ? this.lightbox.state.elements[index - 1] : null;
-        const after = index < this.lightbox.state.elements.length - 1 ? this.lightbox.state.elements[index + 1] : null;
+        const next = index < this.lightbox.state.elements.length - 1 ? this.lightbox.state.elements[index + 1] : null;
         const zooming = this.lightbox.state.zooming;
 
         const wrapperTop = m[0];
@@ -658,11 +841,11 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
                     before !== null && !zooming && <div key={objectKey(before)} className={clsx(classes.element, "element-before")} ref={this.refBefore} style={{ top: elementTop, bottom: elementBottom }}>
                         {this.adapter.renderElement(before, { onLoad: () => { }, width: elementWidth, height: elementHeight })}
                     </div>,
-                    <div key={objectKey(this.focus)} className={classes.element} ref={this.ref} style={{ bottom: elementBottom }}>
-                        {this.adapter.renderElement(this.focus, { onLoad: () => { }, width: elementWidth, height: elementHeight })}
+                    <div key={objectKey(this.focus)} className={classes.element} ref={this.ref} style={{ bottom: elementBottom, opacity: this.state.ready ? 0 : 1 }}>
+                        {this.adapter.renderElement(this.focus, { onLoad: this.handleElementLoad, width: elementWidth, height: elementHeight })}
                     </div>,
-                    after !== null && !zooming && <div key={objectKey(after)} className={clsx(classes.element, "element-after")} ref={this.refAfter} style={{ top: elementTop, bottom: elementBottom }}>
-                        {this.adapter.renderElement(after, { onLoad: () => { }, width: elementWidth, height: elementHeight })}
+                    next !== null && !zooming && <div key={objectKey(next)} className={clsx(classes.element, "element-next")} ref={this.refNext} style={{ top: elementTop, bottom: elementBottom }}>
+                        {this.adapter.renderElement(next, { onLoad: () => { }, width: elementWidth, height: elementHeight })}
                     </div>
                 ]}
             </div>
@@ -774,7 +957,7 @@ class ThumbnailBar<T> extends Component<ThumbnailBarProps<T>, ThumbnailBarState<
             this.lightbox.loadElementsBefore();
         }
         if (this.scrollOffset + this.placementOffset + this.placementWidth < window.innerWidth) {
-            this.lightbox.loadElementsAfter();
+            this.lightbox.loadElementsNext();
         }
     }
 
