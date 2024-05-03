@@ -326,9 +326,12 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
 
     }
 
-    componentDidUpdate(prevProps: Readonly<LightboxProps<Type>>, prevState: Readonly<LightboxState<Type>>, snapshot?: any): void {
+    componentDidUpdate(prevProps: LightboxProps<Type>): void {
         if (!this.props.open && this.state.ready) {
             this.setState({ ready: false });
+        }
+        if (!prevProps.open && this.props.open) {
+            this.setState({ zooming: false });
         }
         this.refreshElements();
     }
@@ -345,7 +348,7 @@ export class Lightbox<Type> extends Component<LightboxProps<Type>, LightboxState
 
         const isTouchDevice = navigator.maxTouchPoints !== 0;
 
-        const { adapter, open, onClose, focus, onFocusChange } = this.props;
+        const { open, onClose } = this.props;
         return <Transition in={open} timeout={{ appear: duration.enteringScreen, enter: duration.enteringScreen, exit: duration.leavingScreen }} nodeRef={this.ref} mountOnEnter unmountOnExit onExiting={() => this.handleExiting?.()}>
             <Transition in={this.state.ready} timeout={duration.complex} nodeRef={this.ref}>
                 {state => (
@@ -442,14 +445,14 @@ interface AccordionProps<T> {
     lightbox: Lightbox<T>,
 }
 
-interface AccordionState<T> {
+interface AccordionState {
     ready: boolean,
 }
 
 const maxScale = 3;
 const minScale = 0.5;
 
-class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
+class Accordion<T> extends Component<AccordionProps<T>, AccordionState> {
 
     lastFocus: T;
 
@@ -484,7 +487,7 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         return this.lightbox.props.focus;
     }
 
-    handleResize = (ev: UIEvent) => {
+    handleResize = () => {
         this.forceUpdate();
     }
 
@@ -522,7 +525,6 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
 
     updateTransform = (easing: "instant" | "ease-out" | "ease-in-out") => {
         const element = this.ref.current! as HTMLElement;
-        const image = element.firstChild as HTMLElement;
 
         if (this.scale < minScale) this.scale = minScale;
         if (this.scale > maxScale) this.scale = maxScale;
@@ -772,6 +774,8 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         const source = this.ref.current!.firstChild as HTMLElement;
         if (!source) return;
 
+        if(this.translateX !== 0 || this.translateY !== 0 || this.scale !== 1) return;
+
         const targetRect = target.getBoundingClientRect();
         const sourceRect = source.getBoundingClientRect();
 
@@ -805,7 +809,7 @@ class Accordion<T> extends Component<AccordionProps<T>, AccordionState<T>> {
         root.removeEventListener("wheel", this.handleWheel);
     }
 
-    componentDidUpdate(prevProps: Readonly<AccordionProps<T>>, prevState: Readonly<AccordionState<T>>, snapshot?: any): void {
+    componentDidUpdate(): void {
         if (this.lastFocus !== this.focus) {
             this.lastFocus = this.focus;
             this.scale = 1;
@@ -861,9 +865,9 @@ interface ThumbnailBarProps<T> {
     lightbox: Lightbox<T>,
 }
 
-type ThumbnailBarState<T> = {}
+type ThumbnailBarState = {}
 
-class ThumbnailBar<T> extends Component<ThumbnailBarProps<T>, ThumbnailBarState<T>> {
+class ThumbnailBar<T> extends Component<ThumbnailBarProps<T>, ThumbnailBarState> {
 
     ref = createRef<HTMLDivElement>();
 
@@ -970,7 +974,7 @@ class ThumbnailBar<T> extends Component<ThumbnailBarProps<T>, ThumbnailBarState<
         this.maybeLoadMore();
     }
 
-    handleClick = (ev: React.MouseEvent, t: T) => {
+    handleClick = (_: React.MouseEvent, t: T) => {
         console.log("handleClick()");
         if (this.scrolling) return;
         this.lightbox.props.onFocusChange(t);
@@ -1026,7 +1030,7 @@ class ThumbnailBar<T> extends Component<ThumbnailBarProps<T>, ThumbnailBarState<
         root.addEventListener("pointerup", handlePointerUp);
     }
 
-    handleResize = (ev: UIEvent) => {
+    handleResize = (_: UIEvent) => {
         this.scrollOffset -= (this.windowWidth - window.innerWidth) / 2;
         this.windowWidth = window.innerWidth;
         this.updateScrolling("instant");
@@ -1066,7 +1070,7 @@ class ThumbnailBar<T> extends Component<ThumbnailBarProps<T>, ThumbnailBarState<
         this.updateScrolling(easing);
     }
 
-    componentDidUpdate(prevProps: Readonly<ThumbnailBarProps<T>>, prevState: Readonly<ThumbnailBarState<T>>, snapshot?: any): void {
+    componentDidUpdate(): void {
         this.updatePlacement();
         if (this.lastFocus !== this.focus) {
             this.lastFocus = this.focus;

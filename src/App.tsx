@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react"
-import "./App.css"
+import { useMemo, useRef, useState } from "react";
+import "./App.css";
 
-import { Lightbox, LightboxAdapter } from "./components/Lightbox"
 import clsx from "clsx";
+import { Lightbox, LightboxAdapter } from "./components/Lightbox";
 
 const maxElements = 20;
 const elementsPerLoad = 10;
@@ -30,7 +30,7 @@ function App() {
       const src = `https://picsum.photos/seed/${seed(n)}/${w}/${h}`;
       return <img key={n} src={src} alt={`Image ${n}`} width={w} height={h} draggable={false} className="lightbox-element" onLoad={onLoad} />
     },
-    renderThumbnail: (n, { onLoad, width, height }) => {
+    renderThumbnail: (n, { onLoad, height }) => {
       const h = height;
       const w = Math.round(ratios[n % ratios.length] * h);
       const src = `https://picsum.photos/seed/${seed(n)}/${w}/${h}`;
